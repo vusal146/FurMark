@@ -15,11 +15,11 @@ class ViewController: NSViewController {
     @IBOutlet var timeLimitStepper: NSStepper?
     @IBOutlet var testPopupButton: NSPopUpButton?
     @IBOutlet var hideScoreDialogButton: NSButton?
-    
+
     @IBOutlet var useFullscreenButton: NSButton?
     @IBOutlet var useAntialiasingButton: NSButton?
     @IBOutlet var useTimeLimitButton: NSButton?
-    
+
 
 
     var useFullscreen = false
@@ -51,7 +51,7 @@ class ViewController: NSViewController {
         }
 
         self.readUserDefaults()
-       
+
     }
 
 
@@ -75,17 +75,17 @@ class ViewController: NSViewController {
 
         self.hideScoreDialogButton?.isEnabled = self.useTimeLimit
 
-        
+
         self.timeLimitField?.isEnabled = self.useTimeLimit
         self.timeLimitStepper?.isEnabled = self.useTimeLimit
         self.timeLimitField?.integerValue = self.timeLimit
         self.timeLimitStepper?.integerValue = self.timeLimit
-        
+
         if (!self.useTimeLimit) {
             self.hideScoreDialog = false
             self.hideScoreDialogButton?.state = .off
         }
-        
+
 
         UserDefaults.standard.set(self.useTimeLimit, forKey: "useTimeLimit")
         UserDefaults.standard.set(self.timeLimit, forKey: "timeLimit")
@@ -113,57 +113,66 @@ class ViewController: NSViewController {
 
     @IBAction func startTest(_ sender: NSButton) {
         var args: [String] = ["/test=\(self.selectedTest)"]
-        let appURL = URL(fileURLWithPath: "/Applications/GpuTest.app")
+        if let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "Geeks3D.GpuTest") {
 
-        self.timeLimit = self.timeLimitField!.integerValue
+            self.timeLimit = self.timeLimitField!.integerValue
 
-        if (self.quitRunningTest()) {
-            sleep(1)
-        }
+            if (self.quitRunningTest()) {
+                sleep(1)
+            }
 
-        if (self.useFullscreen) {
-            args.append("/fullscreen")
-        }
+            if (self.useFullscreen) {
+                args.append("/fullscreen")
+            }
 
-        if (self.useAntialiasing) {
-            args.append("/msaa=4")
+            if (self.useAntialiasing) {
+                args.append("/msaa=4")
+            } else {
+                args.append("/msaa=0")
+            }
+
+            if (self.hideScoreDialog) {
+                args.append("/no_scorebox")
+            }
+
+            if (self.useTimeLimit && self.timeLimit > 0) {
+                let ms = self.timeLimit * 60000
+
+                args.append("/benchmark")
+                args.append("/benchmark_duration_ms=\(ms)")
+            }
+
+
+            let configuration = NSWorkspace.OpenConfiguration()
+            configuration.arguments = args
+
+
+            NSWorkspace.shared.openApplication(at: appURL, configuration: configuration)
+
+            if (self.useTimeLimit && self.timeLimit > 0) {
+                self.soundTimer = Timer.scheduledTimer(timeInterval: TimeInterval((self.timeLimit * 60) + 5), target: self, selector: #selector(self.notifyComplete), userInfo: nil, repeats: false)
+            }
         } else {
-            args.append("/msaa=0")
-        }
-
-        if (self.hideScoreDialog) {
-            args.append("/no_scorebox")
-        }
-
-        if (self.useTimeLimit && self.timeLimit > 0) {
-            let ms = self.timeLimit * 60000
-
-            args.append("/benchmark")
-            args.append("/benchmark_duration_ms=\(ms)")
-        }
-
-
-        let configuration = NSWorkspace.OpenConfiguration()
-        configuration.arguments = args
-
-        NSWorkspace.shared.openApplication(at: appURL, configuration: configuration)
-
-        if (self.useTimeLimit && self.timeLimit > 0) {
-            self.soundTimer = Timer.scheduledTimer(timeInterval: TimeInterval((self.timeLimit * 60) + 5), target: self, selector: #selector(self.notifyComplete), userInfo: nil, repeats: false)
+            let alert = NSAlert()
+            alert.messageText = "Error"
+            alert.informativeText = "Could not find GpuTest.app. Please download from Geeks3D or use the Download option under the File menu."
+            alert.alertStyle = .critical
+            alert.addButton(withTitle: "OK")
+            alert.runModal()
         }
     }
-    
+
     func readUserDefaults() {
         self.useFullscreen = UserDefaults.standard.bool(forKey: "useFullscreen")
         self.useTimeLimit = UserDefaults.standard.bool(forKey: "useTimeLimit")
         self.useAntialiasing = UserDefaults.standard.bool(forKey: "useAntialiasing")
         self.hideScoreDialog = UserDefaults.standard.bool(forKey: "hideScoreDialog")
-        
+
         self.useFullscreenButton?.state = self.useFullscreen ? .on : .off
         self.useTimeLimitButton?.state = self.useTimeLimit ? .on : .off
         self.useAntialiasingButton?.state = self.useAntialiasing ? .on : .off
         self.hideScoreDialogButton?.state = self.hideScoreDialog ? .on : .off
-        
+
         if (UserDefaults.standard.integer(forKey: "timeLimit") > 0) {
             self.timeLimit = UserDefaults.standard.integer(forKey: "timeLimit")
             self.timeLimitStepper?.integerValue = self.timeLimit
@@ -174,19 +183,19 @@ class ViewController: NSViewController {
                 self.timeLimitField?.isEnabled = true
                 self.hideScoreDialogButton?.isEnabled = true
             }
-            
+
             if (self.timeLimit == 1) {
                 self.minutesLabel?.stringValue = "minute"
             } else {
                 self.minutesLabel?.stringValue = "minutes"
             }
         }
-        
+
         if let lastTest = UserDefaults.standard.object(forKey: "lastTest") as? String {
             self.testPopupButton?.selectItem(withTitle: lastTest)
             self.selectedTest = lastTest
         } else {
-             self.testPopupButton?.selectItem(withTitle: "Furry Donut")
+            self.testPopupButton?.selectItem(withTitle: "Furry Donut")
         }
     }
 
@@ -226,6 +235,5 @@ class ViewController: NSViewController {
         alert.addButton(withTitle: "OK")
         alert.runModal()
     }
-
 }
 
